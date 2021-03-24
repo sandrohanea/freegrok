@@ -32,7 +32,7 @@ namespace FreeGrok.Client
                             .WithAutomaticReconnect();
                           connection = builder.Build();
                           await connection.StartAsync();
-                          Console.WriteLine($"Listening on localhost:{o.Port} with domain {o.Domain}");
+                          Console.WriteLine($"Listening on localhost:{o.Port} with domain {o.Domain}\nPress enter to exit.");
                           var result = await connection.InvokeAsync<bool>("Register", new RegisterDto()
                           {
                               Domain = o.Domain,
@@ -45,8 +45,12 @@ namespace FreeGrok.Client
                           }
                           connection.On("Handle", new[] { typeof(RequestDto) }, (args) => HandleRequest(args[0] as RequestDto));
                           connection.Reconnected += Connection_Reconnected;
-                          await Task.Run(() => Console.ReadKey());
-
+                          ConsoleKeyInfo key;
+                          do
+                          {
+                              key = await Task.Run(() => Console.ReadKey());
+                          } while (key.Key != ConsoleKey.Enter);
+                        
                           await connection.DisposeAsync();
                       });
         }
