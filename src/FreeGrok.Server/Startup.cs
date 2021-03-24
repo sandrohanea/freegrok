@@ -44,6 +44,7 @@ namespace FreeGrok.Server
             {
                 app.UseDeveloperExceptionPage();
             }
+            app.UseWebSockets();
             app.UseRouting();
             app.UseMiddleware<ForwardMiddleware>();
             app.UseEndpoints(endpoints =>

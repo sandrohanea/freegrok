@@ -121,8 +121,13 @@ namespace FreeGrok.Client
                     requestMessage.Headers.Add(header.Key, options.Host);
                     continue;
                 }
-                if (header.Key.ToUpper().StartsWith("CONTENT") && request.HaveContent)
+                if (header.Key.ToUpper().StartsWith("CONTENT"))
                 {
+                    if(requestMessage.Content == null)
+                    {
+                        requestMessage.Content = new StringContent(string.Empty);
+                        requestMessage.Content.Headers.Clear();
+                    }
                     requestMessage.Content.Headers.Add(header.Key, header.Value);
                     continue;
                 }
@@ -166,6 +171,7 @@ namespace FreeGrok.Client
                     RequestId = request.RequestId
                 };
                 await connection.InvokeAsync("Response", responseDto);
+                Console.WriteLine($" {request.Method} \t{request.Path}\t{responseDto.StatusCode}");
 
                 if (haveContent)
                 {
