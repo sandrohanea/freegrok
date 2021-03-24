@@ -2,7 +2,7 @@
   "profiles": {
     "FreeGrok.Client": {
       "commandName": "Project",
-      "commandLineArgs": "-p 1000 -d \"test.localhost\" -h \"localhost:5000\""
+      "commandLineArgs": "-p 44310 -d \"l.sandro.rocks\" -h \"localhost:44310\""
     }
   }
 }

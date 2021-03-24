@@ -26,13 +26,20 @@ namespace FreeGrok.Server.Hubs
             httpContext.Response.Headers.Clear();
             foreach (var header in responseDto.Headers)
             {
+                // We need to skip this as the transfer won't be chunked anymore
+                if (header.Key.ToUpper() == "TRANSFER-ENCODING")
+                {
+                    continue;
+                }
                 httpContext.Response.Headers.Add(header.Key, header.Value);
             }
             httpContext.Response.StatusCode = responseDto.StatusCode;
             await httpContext.Response.BodyWriter.WriteAsync(responseDto.Content);
-
+            //using var ms = new MemoryStream(responseDto.Content);
+            //await ms.CopyToAsync(httpContext.Response.Body);
             store.FinishRequest(responseDto.RequestId);
         }
+
 
         public override Task OnDisconnectedAsync(Exception exception)
         {

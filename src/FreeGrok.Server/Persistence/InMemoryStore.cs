@@ -37,7 +37,7 @@ namespace FreeGrok.Server.Persistence
         public void FinishRequest(Guid requestId)
         {
             requests.TryRemove(requestId, out var requestData);
-            requestData.taskCompletionSource.SetResult();
+            requestData.taskCompletionSource?.SetResult();
         }
 
         public void RemoveClient(string connectionId)
