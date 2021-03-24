@@ -7,8 +7,9 @@ namespace FreeGrok.Common
     {
         public Guid RequestId { get; set; }
 
-        public byte[] Content { get; set; }
         public int StatusCode { get; set; }
+
+        public bool HaveContent { get; set; }
 
         public List<HeaderDto> Headers { get; set; }
     }

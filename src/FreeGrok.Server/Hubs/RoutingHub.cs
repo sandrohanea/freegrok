@@ -2,6 +2,8 @@
 using FreeGrok.Server.Persistence;
 using Microsoft.AspNetCore.SignalR;
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FreeGrok.Server.Hubs
@@ -20,26 +22,46 @@ namespace FreeGrok.Server.Hubs
             return store.TryAddClient(Context.ConnectionId, registerDto.Domain, Clients.Caller);
         }
 
-        public async Task Finish(ResponseDto responseDto)
+        public void Response(ResponseDto responseDto)
         {
-            var httpContext = store.GetHttpContext(responseDto.RequestId);
-            httpContext.Response.Headers.Clear();
-            foreach (var header in responseDto.Headers)
+            try
             {
-                // We need to skip this as the transfer won't be chunked anymore
-                if (header.Key.ToUpper() == "TRANSFER-ENCODING")
+                var httpContext = store.GetHttpContext(responseDto.RequestId);
+                httpContext.Response.Headers.Clear();
+                foreach (var header in responseDto.Headers)
                 {
-                    continue;
+                    // We need to skip this as the transfer won't be chunked anymore
+                    if (header.Key.ToUpper() == "TRANSFER-ENCODING")
+                    {
+                        continue;
+                    }
+                    httpContext.Response.Headers.Add(header.Key, header.Value);
                 }
-                httpContext.Response.Headers.Add(header.Key, header.Value);
+                httpContext.Response.StatusCode = responseDto.StatusCode;
+                if (!responseDto.HaveContent)
+                {
+                    store.FinishRequest(responseDto.RequestId);
+                }
             }
-            httpContext.Response.StatusCode = responseDto.StatusCode;
-            await httpContext.Response.BodyWriter.WriteAsync(responseDto.Content);
-            //using var ms = new MemoryStream(responseDto.Content);
-            //await ms.CopyToAsync(httpContext.Response.Body);
-            store.FinishRequest(responseDto.RequestId);
+            catch (Exception ex)
+            {
+                store.FinishRequest(responseDto.RequestId);
+                Console.WriteLine(ex.Message);
+            }
         }
 
+        public async Task OnResponseData(ResponseContentDto contentDto)
+        {
+            var httpContext = store.GetHttpContext(contentDto.RequestId);
+            if (contentDto.Data.Length > 0)
+            {
+                await httpContext.Response.Body.WriteAsync(contentDto.Data, 0, contentDto.DataSize);
+            }
+            if (contentDto.IsFinished)
+            {
+                store.FinishRequest(contentDto.RequestId);
+            }
+        }
 
         public override Task OnDisconnectedAsync(Exception exception)
         {

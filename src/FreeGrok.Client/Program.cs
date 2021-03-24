@@ -14,8 +14,8 @@ namespace FreeGrok.Client
 {
     class Program
     {
-        private static readonly HttpClient httpClient = new HttpClient(new HttpClientHandler() { UseCookies = false });
-
+        private static readonly HttpClient httpClient = new HttpClient(new HttpClientHandler() { UseCookies = false }) { Timeout = TimeSpan.FromDays(2) };
+        private static Dictionary<Guid, RequestStreamContent> requestStreams = new();
         private static Options options;
         private static HubConnection connection;
 
@@ -43,14 +43,15 @@ namespace FreeGrok.Client
                               await connection.DisposeAsync();
                               return;
                           }
-                          connection.On("Handle", new[] { typeof(RequestDto) }, (args) => HandleRequest(args[0] as RequestDto));
+                          connection.On<InitializeConnectionDto>("OnInitializeConnection", (request) => InitializeConnection(request).ConfigureAwait(false));
+                          connection.On<RequestContentDto>("OnRequestData", (request) => OnRequestDataAsync(request).ConfigureAwait(false));
                           connection.Reconnected += Connection_Reconnected;
                           ConsoleKeyInfo key;
                           do
                           {
                               key = await Task.Run(() => Console.ReadKey());
                           } while (key.Key != ConsoleKey.Enter);
-                        
+
                           await connection.DisposeAsync();
                       });
         }
@@ -71,62 +72,21 @@ namespace FreeGrok.Client
             Console.WriteLine($"Reconnected and listening on localhost:{options.Port} with domain {options.Domain}");
         }
 
-        private static async Task HandleRequestWithHttpRequest(RequestDto request)
+        private static async Task OnRequestDataAsync(RequestContentDto request)
         {
-
-            var httpRequest = (HttpWebRequest)WebRequest.Create($"http{(options.UseHttps ? "s" : "")}://localhost:{options.Port}{request.Path}");
-            httpRequest.Method = request.Method;
-            foreach (var header in request.Headers)
+            var haveRequestStream = requestStreams.TryGetValue(request.RequestId, out var requestStream);
+            if (!haveRequestStream)
             {
-                if (header.Key.StartsWith(":"))
-                {
-                    continue;
-                }
-                if (header.Key.ToUpper() == "HOST" && !string.IsNullOrEmpty(options.Host))
-                {
-                    httpRequest.Headers.Add(header.Key, options.Host);
-                    continue;
-                }
-                httpRequest.Headers.Add(header.Key, header.Value);
+                return;
             }
-            ResponseDto responseDto = null;
-            try
+            await requestStream.SendDataAsync(request.Data, request.DataSize, request.IsFinished);
+            if (request.IsFinished)
             {
-                using var response = (HttpWebResponse)httpRequest.GetResponse();
-                using var responseStream = response.GetResponseStream();
-                using var ms = new MemoryStream();
-                await responseStream.CopyToAsync(ms);
-                var bytes = ms.ToArray();
-                var responseHeaders = new List<HeaderDto>();
-                for (int i = 0; i < response.Headers.Count; ++i)
-                {
-                    responseHeaders.Add(new HeaderDto() { Key = response.Headers.Keys[i], Value = response.Headers[i] });
-                }
-                responseDto = new ResponseDto()
-                {
-                    Content = bytes,
-                    Headers = responseHeaders,
-                    StatusCode = (int)response.StatusCode,
-                    RequestId = request.RequestId
-                };
+                requestStreams.Remove(request.RequestId);
             }
-            catch
-            {
-                Console.WriteLine($"Coudn't connect to the specied port: {options.Port}");
-                responseDto = new ResponseDto()
-                {
-                    StatusCode = 404,
-                    RequestId = request.RequestId,
-                    Headers = new List<HeaderDto>(),
-                    Content = Array.Empty<byte>()
-                };
-            }
-            Console.WriteLine($"{request.Method}\t{request.Path}\t{responseDto.StatusCode}\r{responseDto.Content?.Length ?? 0}");
-            await connection.InvokeAsync("Finish", responseDto);
-
         }
 
-        private static async Task HandleRequest(RequestDto request)
+        private static async Task InitializeConnection(InitializeConnectionDto request)
         {
             var requestMessage = new HttpRequestMessage
             {
@@ -144,6 +104,12 @@ namespace FreeGrok.Client
                 RequestUri = new Uri($"http{(options.UseHttps ? "s" : "")}://localhost:{options.Port}{request.Path}")
             };
 
+            if (request.HaveContent)
+            {
+                var streamContent = new RequestStreamContent(request.BodyLength);
+                requestStreams.Add(request.RequestId, streamContent);
+                requestMessage.Content = streamContent;
+            }
             foreach (var header in request.Headers)
             {
                 if (header.Key.StartsWith(":"))
@@ -155,8 +121,14 @@ namespace FreeGrok.Client
                     requestMessage.Headers.Add(header.Key, options.Host);
                     continue;
                 }
+                if (header.Key.ToUpper().StartsWith("CONTENT") && request.HaveContent)
+                {
+                    requestMessage.Content.Headers.Add(header.Key, header.Value);
+                    continue;
+                }
                 requestMessage.Headers.Add(header.Key, header.Value);
             }
+
             ResponseDto responseDto = null;
             try
             {
@@ -177,30 +149,64 @@ namespace FreeGrok.Client
                     }
                 }
 
-                var responseContent = await response.Content.ReadAsStringAsync();
+                
+
+                using var responseContentStream = await response.Content.ReadAsStreamAsync();
+
+                var data = new byte[Constants.StreamBufferSize];
+                var dataSize = await responseContentStream.ReadAsync(data);
+                var haveContent = dataSize != 0;
+
 
                 responseDto = new ResponseDto()
                 {
-                    Content = await response.Content.ReadAsByteArrayAsync(),
+                    HaveContent = haveContent,
                     Headers = responseHeaders,
                     StatusCode = (int)response.StatusCode,
                     RequestId = request.RequestId
                 };
+                await connection.InvokeAsync("Response", responseDto);
 
+                if (haveContent)
+                {
+                    await connection.InvokeAsync(
+                                                "OnResponseData",
+                                                new RequestContentDto()
+                                                {
+                                                    Data = data,
+                                                    IsFinished = dataSize < Constants.StreamBufferSize,
+                                                    DataSize = dataSize,
+                                                    RequestId = request.RequestId
+                                                });
+                }
+                while (dataSize == Constants.StreamBufferSize)
+                {
+                    dataSize = await responseContentStream.ReadAsync(data);
+                    await connection.InvokeAsync(
+                                                "OnResponseData",
+                                                new RequestContentDto()
+                                                {
+                                                    Data = data,
+                                                    IsFinished = dataSize < Constants.StreamBufferSize,
+                                                    DataSize = dataSize,
+                                                    RequestId = request.RequestId
+                                                });
+
+                }
             }
             catch (HttpRequestException httpRequestException)
             {
                 Console.WriteLine($"Coudn't connect to the specied port: {options.Port}");
+                Console.WriteLine($"Exception: {httpRequestException.Message}");
                 responseDto = new ResponseDto()
                 {
                     StatusCode = (int?)httpRequestException.StatusCode ?? 404,
                     RequestId = request.RequestId,
-                    Headers = new List<HeaderDto>(),
-                    Content = Array.Empty<byte>()
+                    Headers = new List<HeaderDto>()
                 };
+                Console.WriteLine($" {request.Method} \t{request.Path}\t{responseDto.StatusCode}");
+                await connection.InvokeAsync("Response", responseDto);
             }
-            Console.WriteLine($" {request.Method} \t{request.Path}\t{responseDto.StatusCode}\t{responseDto.Content?.Length ?? 0}");
-            await connection.InvokeAsync("Finish", responseDto);
         }
     }
 }
