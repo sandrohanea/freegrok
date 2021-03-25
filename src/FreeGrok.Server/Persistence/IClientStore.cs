@@ -5,17 +5,12 @@ using System.Threading.Tasks;
 
 namespace FreeGrok.Server.Persistence
 {
-    public interface IStore
+    public interface IClientStore
     {
         bool TryAddClient(string connectionId, string host, IClientProxy caller);
 
-        void RemoveClient(string connectionId);
+        bool TryRemoveClient(string connectionId, out string host);
 
         public IClientProxy GetClientProxy(string host);
-        void RegisterRequest(Guid requestId, string host, TaskCompletionSource taskCompletionSource, HttpContext context);
-
-        HttpContext GetHttpContext(Guid requestId);
-
-        void FinishRequest(Guid requestId);
     }
 }

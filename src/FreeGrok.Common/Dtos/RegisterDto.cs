@@ -1,4 +1,4 @@
-﻿namespace FreeGrok.Common
+﻿namespace FreeGrok.Common.Dtos
 {
     public class RegisterDto
     {

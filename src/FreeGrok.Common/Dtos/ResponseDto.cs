@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace FreeGrok.Common
+namespace FreeGrok.Common.Dtos
 {
-    public class InitializeConnectionDto
+    public class ResponseDto
     {
         public Guid RequestId { get; set; }
 
-        public string Method { get; set; }
-        public string Path { get; set; }
-
-        public long? BodyLength { get; set; }
+        public int StatusCode { get; set; }
 
         public bool HaveContent { get; set; }
 

@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace FreeGrok.Common
+namespace FreeGrok.Common.Dtos
 {
-    public class RequestContentDto
+    public class ResponseContentDto
     {
         public Guid RequestId { get; set; }
 

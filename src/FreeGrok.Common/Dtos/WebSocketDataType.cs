@@ -4,12 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FreeGrok.Common
+namespace FreeGrok.Common.Dtos
 {
-    public class CookieDto
+    public enum WebSocketDataType
     {
-        public string Key { get; set; }
-
-        public string Value { get; set; }
+        Binary,
+        Text,
+        Close
     }
 }

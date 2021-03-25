@@ -1,8 +1,8 @@
-﻿using FreeGrok.Common;
+﻿using FreeGrok.Common.Dtos;
 using FreeGrok.Server.Persistence;
+using FreeGrok.Server.ServerHandlers;
 using Microsoft.AspNetCore.SignalR;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,11 +10,15 @@ namespace FreeGrok.Server.Hubs
 {
     public class RoutingHub : Hub
     {
-        private readonly IStore store;
+        private readonly IClientStore store;
+        private readonly IHttpServerHandler httpServerHandler;
+        private readonly IWebSocketServerHandler webSocketServerHandler;
 
-        public RoutingHub(IStore store)
+        public RoutingHub(IClientStore store, IHttpServerHandler httpServerHandler, IWebSocketServerHandler webSocketServerHandler)
         {
             this.store = store;
+            this.httpServerHandler = httpServerHandler;
+            this.webSocketServerHandler = webSocketServerHandler;
         }
 
         public bool Register(RegisterDto registerDto)
@@ -22,51 +26,35 @@ namespace FreeGrok.Server.Hubs
             return store.TryAddClient(Context.ConnectionId, registerDto.Domain, Clients.Caller);
         }
 
-        public void Response(ResponseDto responseDto)
+        public async Task Response(ResponseDto responseDto)
         {
-            try
-            {
-                var httpContext = store.GetHttpContext(responseDto.RequestId);
-                httpContext.Response.Headers.Clear();
-                foreach (var header in responseDto.Headers)
-                {
-                    // We need to skip this as the transfer won't be chunked anymore
-                    if (header.Key.ToUpper() == "TRANSFER-ENCODING")
-                    {
-                        continue;
-                    }
-                    httpContext.Response.Headers.Add(header.Key, header.Value);
-                }
-                httpContext.Response.StatusCode = responseDto.StatusCode;
-                if (!responseDto.HaveContent)
-                {
-                    store.FinishRequest(responseDto.RequestId);
-                }
-            }
-            catch (Exception ex)
-            {
-                store.FinishRequest(responseDto.RequestId);
-                Console.WriteLine(ex.Message);
-            }
+            await httpServerHandler.OnResponseAsync(responseDto, Context.ConnectionAborted);
         }
 
         public async Task OnResponseData(ResponseContentDto contentDto)
         {
-            var httpContext = store.GetHttpContext(contentDto.RequestId);
-            if (contentDto.Data.Length > 0)
-            {
-                await httpContext.Response.Body.WriteAsync(contentDto.Data, 0, contentDto.DataSize);
-            }
-            if (contentDto.IsFinished)
-            {
-                store.FinishRequest(contentDto.RequestId);
-            }
+            await httpServerHandler.OnResponseDataAsync(contentDto, Context.ConnectionAborted);
         }
 
-        public override Task OnDisconnectedAsync(Exception exception)
+        public async Task OnSendWSData(WebSocketDataDto webSocketDataDto)
         {
-            store.RemoveClient(Context.ConnectionId);
-            return base.OnDisconnectedAsync(exception);
+            await webSocketServerHandler.OnSendWSDataAsync(webSocketDataDto, Context.ConnectionAborted);
+        }
+
+        public Task CloseWS(CloseWebSocketDto closeWebSocketDto)
+        {
+            return webSocketServerHandler.FinishWebSocketAsync(closeWebSocketDto.WebSocketId);
+        }
+
+        public override async Task OnDisconnectedAsync(Exception exception)
+        {
+            var haveHost = store.TryRemoveClient(Context.ConnectionId, out var host);
+            if (haveHost)
+            {
+                httpServerHandler.FinishRequests(host);
+                await webSocketServerHandler.FinishWebSocketsAsync(host);
+            }
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }

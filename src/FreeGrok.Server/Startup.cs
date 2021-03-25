@@ -2,6 +2,7 @@ using FreeGrok.Common;
 using FreeGrok.Server.Hubs;
 using FreeGrok.Server.Middlewares;
 using FreeGrok.Server.Persistence;
+using FreeGrok.Server.ServerHandlers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -18,7 +19,6 @@ namespace FreeGrok.Server
 {
     public class Startup
     {
-        private readonly IStore store = new InMemoryStore();
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -34,7 +34,9 @@ namespace FreeGrok.Server
             {
                 options.ConstraintMap.Add("notDomainRoute", typeof(NotDomainRouteConstraint));
             });
-            services.AddSingleton(store);
+            services.AddSingleton<IClientStore, ClientStore>();
+            services.AddSingleton<IHttpServerHandler, HttpServerHandler>();
+            services.AddSingleton<IWebSocketServerHandler, WebSocketServerHandler>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -46,7 +48,8 @@ namespace FreeGrok.Server
             }
             app.UseWebSockets();
             app.UseRouting();
-            app.UseMiddleware<ForwardMiddleware>();
+            app.UseMiddleware<HttpForwardMiddleware>();
+            app.UseMiddleware<WebSocketForwardMiddleware>();
             app.UseEndpoints(endpoints =>
             {
                 endpoints.Map("{**path:notDomainRoute}", HandleRequestAsync);
@@ -54,10 +57,14 @@ namespace FreeGrok.Server
             });
         }
 
-        private async Task HandleRequestAsync(HttpContext context)
+        /// <summary>
+        /// This is only needed to map the endpoint to something so <seealso cref="HttpForwardMiddleware"/> will be invoked.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        private Task HandleRequestAsync(HttpContext context)
         {
-            var host = context.Request.Host.Host;
-
+            return Task.CompletedTask;
         }
     }
 }

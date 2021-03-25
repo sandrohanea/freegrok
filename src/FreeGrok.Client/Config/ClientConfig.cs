@@ -1,10 +1,10 @@
 ﻿using System;
 
-namespace FreeGrok.Client
+namespace FreeGrok.Client.Config
 {
     public class ClientConfig
     {
-        public string DefaultUrl { get; set; }
+        public string RemoteUrl { get; set; }
 
         public Guid Id { get; set; }
     }

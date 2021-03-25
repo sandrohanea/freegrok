@@ -14,8 +14,8 @@ namespace FreeGrok.Client
         [Option('r', "remoteUrl", Required = false, HelpText = "Set the remote URL.")]
         public string Remote { get; set; }
 
-        [Option('s', "useHttps", Required = false, Default = true, HelpText = "Set a flag indicating if Https should be used for localhost")]
-        public bool UseHttps { get; set; }
+        [Option('t', "Type", Required = false, Default = "https", HelpText = "Set the type of the forwarding.")]
+        public string Type { get; set; }
 
         [Option('h', "host", Required = false, HelpText = "Set a value which will override the host header in all requests")]
         public string Host { get; set; }
