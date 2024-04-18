@@ -5,31 +5,30 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks;
 
-namespace FreeGrok.Server.Middlewares
+namespace FreeGrok.Server.Middleware
 {
-    public class HttpForwardMiddleware : ForwardMiddleware
+    public class WebSocketForwardMiddleware : ForwardMiddleware
     {
         private readonly RequestDelegate next;
 
-        public HttpForwardMiddleware(RequestDelegate next) : base(next)
+        public WebSocketForwardMiddleware(RequestDelegate next) : base(next)
         {
             this.next = next;
         }
-        public async Task InvokeAsync(HttpContext context, IConfiguration configuration, IClientStore clientStore, IHttpServerHandler httpServerHandler)
+
+        public async Task InvokeAsync(HttpContext context, IConfiguration configuration, IClientStore clientStore, IWebSocketServerHandler webSocketServerHandler)
         {
             var shouldForward = await ShouldForwardAsync(context, configuration, clientStore);
             if (!shouldForward)
             {
                 return;
             }
-
-            if (context.WebSockets.IsWebSocketRequest)
+            if (!context.WebSockets.IsWebSocketRequest)
             {
                 await next(context);
                 return;
             }
-
-            await httpServerHandler.OnRequestAsync(context, context.RequestAborted);
+            await webSocketServerHandler.OnRequestAsync(context, context.RequestAborted);
         }
     }
 }

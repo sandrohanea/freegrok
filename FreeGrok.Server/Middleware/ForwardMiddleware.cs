@@ -2,12 +2,9 @@
 using FreeGrok.Server.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
-namespace FreeGrok.Server.Middlewares
+namespace FreeGrok.Server.Middleware
 {
     public abstract class ForwardMiddleware
     {

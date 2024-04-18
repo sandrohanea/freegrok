@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FreeGrok.Client": {
+      "commandName": "Project",
+      "commandLineArgs": "-p 8080 -d \"l.sandro.rocks\" -h \"localhost:8080\" -r \"https://localhost:5001/\" -t http"
+    }
+  }
+}

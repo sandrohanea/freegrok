@@ -1,6 +1,6 @@
 using FreeGrok.Common;
 using FreeGrok.Server.Hubs;
-using FreeGrok.Server.Middlewares;
+using FreeGrok.Server.Middleware;
 using FreeGrok.Server.Persistence;
 using FreeGrok.Server.ServerHandlers;
 using Microsoft.AspNetCore.Builder;

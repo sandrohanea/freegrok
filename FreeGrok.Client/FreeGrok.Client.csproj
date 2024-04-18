@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<PackAsTool>true</PackAsTool>
+		<ToolCommandName>freegrok</ToolCommandName>
+		<PackageOutputPath>./nupkg</PackageOutputPath>
+		<Version>1.0.0</Version>
+		<PackageId>FreeGrok</PackageId>
+		<RepositoryUrl>https://github.com/sandrohanea/freegrok</RepositoryUrl>
+		<PackageProjectUrl>>https://github.com/sandrohanea/freegrok</PackageProjectUrl>
+		<RepositoryType>GIT</RepositoryType>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<PackageReadmeFile>readme.md</PackageReadmeFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\LICENSE" Pack="true" PackagePath="" />
+		<None Include="..\readme.md" Pack="true" PackagePath="" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="CommandLineParser" Version="2.9.1" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\FreeGrok.Common\FreeGrok.Common.csproj" />
+	</ItemGroup>
+
+</Project>

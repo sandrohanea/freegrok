@@ -19,7 +19,7 @@ namespace FreeGrok.Client
         {
 
             var builder = new HubConnectionBuilder()
-                           .WithUrl($"{clientConfig.RemoteUrl}routing")
+                           .WithUrl(new Uri(new Uri(clientConfig.RemoteUrl), "routing"))
                            .WithAutomaticReconnect();
 
             this.connection = builder.Build();
